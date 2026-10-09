@@ -29,7 +29,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 
-export default function Painel({ perfil, demo, abaInicial }: { perfil: Perfil; demo: boolean; abaInicial?: string }) {
+export default function Painel({ perfil, demo, abaInicial, erroConfig }: { perfil: Perfil; demo: boolean; abaInicial?: string; erroConfig?: string | null }) {
   const [itens, setItens] = useState<Item[]>([]);
   const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -42,6 +42,7 @@ export default function Painel({ perfil, demo, abaInicial }: { perfil: Perfil; d
   const [editando, setEditando] = useState<Rascunho | null>(null);
   const [verCampanhas, setVerCampanhas] = useState(false);
   const [aviso, setAviso] = useState<{ texto: string; erro?: boolean } | null>(null);
+  const [falha, setFalha] = useState<string | null>(null);
 
   // a aba fica no endereço (?aba=disparo), então dá para mandar o link direto
   const setAba = (a: Aba) => {
@@ -59,8 +60,9 @@ export default function Painel({ perfil, demo, abaInicial }: { perfil: Perfil; d
       const [i, c] = await Promise.all([api<Item[]>("/api/itens"), api<Campanha[]>("/api/campanhas")]);
       setItens(i);
       setCampanhas(c);
+      setFalha(null);
     } catch (e) {
-      avisar((e as Error).message, true);
+      setFalha((e as Error).message);
     } finally {
       setCarregando(false);
     }
@@ -185,7 +187,12 @@ export default function Painel({ perfil, demo, abaInicial }: { perfil: Perfil; d
 
   return (
     <div className="min-h-dvh">
-      {demo && (
+      {(erroConfig || falha) && (
+        <div className="text-center text-sm font-semibold py-2.5 px-4" style={{ background: "var(--perigo)", color: "#fff" }}>
+          ⚠ O banco de dados não está respondendo: {erroConfig ?? falha}
+        </div>
+      )}
+      {demo && !erroConfig && (
         <div className="text-center text-xs font-semibold py-1.5 px-4" style={{ background: "var(--alerta-bg)", color: "var(--alerta)" }}>
           Modo demonstração: o banco de dados ainda não foi conectado e nada fica salvo.
         </div>

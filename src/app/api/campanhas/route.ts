@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { excluirCampanha, listarCampanhas, salvarCampanha } from "@/lib/store";
+import { excluirCampanha, listarCampanhas, salvarCampanha, explicarErro } from "@/lib/store";
 import { erro, perfilAtual } from "@/lib/sessao";
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
   try {
     return NextResponse.json(await listarCampanhas());
   } catch (e) {
-    return erro(`Não foi possível carregar: ${(e as Error).message}`, 500);
+    return erro(explicarErro(e), 500);
   }
 }
 
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(await salvarCampanha({ id: b.id, nome, cor, ativa: b.ativa ?? true }));
   } catch (e) {
-    return erro(`Não foi possível salvar: ${(e as Error).message}`, 500);
+    return erro(`Não foi possível salvar: ${explicarErro(e)}`, 500);
   }
 }
 
@@ -38,6 +38,6 @@ export async function DELETE(request: Request) {
     await excluirCampanha(id);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return erro(`Não foi possível excluir: ${(e as Error).message}`, 500);
+    return erro(`Não foi possível excluir: ${explicarErro(e)}`, 500);
   }
 }

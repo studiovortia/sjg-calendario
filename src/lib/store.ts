@@ -8,17 +8,68 @@ import type { Campanha, Item, ItemInput, Perfil } from "./types";
 // somem ao reiniciar) — útil só para testar no computador.
 // ---------------------------------------------------------------------
 
+// Aceita os formatos mais comuns que alguém pode colar no Vercel:
+// "https://abc.supabase.co", "abc.supabase.co", só o código "abc",
+// o link do painel ".../dashboard/project/abc/..." ou ".../rest/v1".
+export function normalizarUrl(bruto: string | undefined): string | null {
+  if (!bruto) return null;
+  let v = bruto.trim().replace(/^["']|["']$/g, "").trim();
+  const painel = v.match(/project\/([a-z0-9]{15,})/i);
+  if (painel) return `https://${painel[1].toLowerCase()}.supabase.co`;
+  if (/^[a-z0-9]{15,}$/i.test(v)) return `https://${v.toLowerCase()}.supabase.co`;
+  if (!/^https?:\/\//i.test(v)) v = `https://${v}`;
+  v = v.replace(/\/+$/, "").replace(/\/rest\/v1$/i, "").replace(/\/+$/, "");
+  try {
+    const u = new URL(v);
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+type Config = { url: string; key: string } | { erro: string } | null;
+
+function lerConfig(): Config {
+  const urlBruta = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim().replace(/^["']|["']$/g, "");
+  if (!urlBruta && !key) return null; // modo demonstração
+  if (!urlBruta) return { erro: "Falta a variável SUPABASE_URL no Vercel." };
+  if (!key) return { erro: "Falta a variável SUPABASE_SERVICE_ROLE_KEY no Vercel." };
+  const url = normalizarUrl(urlBruta);
+  if (!url) return { erro: `SUPABASE_URL não parece um endereço válido (começa com "${urlBruta.slice(0, 12)}…"). O certo é algo como https://abcdefgh.supabase.co` };
+  if (key.startsWith("sb_publishable_")) return { erro: "SUPABASE_SERVICE_ROLE_KEY está com a chave pública (sb_publishable_). Use a chave secreta (sb_secret_)." };
+  return { url, key };
+}
+
 let sb: SupabaseClient | null = null;
 function supabase(): SupabaseClient | null {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  if (!sb) sb = createClient(url, key, { auth: { persistSession: false } });
+  const c = lerConfig();
+  if (!c) return null;
+  if ("erro" in c) throw new Error(c.erro);
+  if (!sb) sb = createClient(c.url, c.key, { auth: { persistSession: false } });
   return sb;
 }
 
 export function modoDemo(): boolean {
-  return supabase() === null;
+  return lerConfig() === null;
+}
+
+/** Problema de configuração, para mostrar na tela em vez de quebrar o site. */
+export function erroConfig(): string | null {
+  const c = lerConfig();
+  return c && "erro" in c ? c.erro : null;
+}
+
+/** Traduz erros comuns do banco para algo que dá para resolver. */
+export function explicarErro(e: unknown): string {
+  const m = (e as Error)?.message ?? String(e);
+  if (/relation .* does not exist|Could not find the table|schema cache/i.test(m))
+    return "As tabelas ainda não existem no Supabase. Rode o arquivo schema.sql no SQL Editor.";
+  if (/Invalid API key|JWT|apikey|Unauthorized|401/i.test(m))
+    return "A chave do Supabase foi recusada. Confira se SUPABASE_SERVICE_ROLE_KEY é a chave secreta (sb_secret_) do mesmo projeto.";
+  if (/fetch failed|ENOTFOUND|getaddrinfo|Failed to fetch/i.test(m))
+    return "Não foi possível falar com o Supabase. Confira o endereço em SUPABASE_URL.";
+  return m;
 }
 
 // ---------- modo demonstração ----------

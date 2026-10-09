@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { criarItem, listarItens } from "@/lib/store";
+import { criarItem, listarItens, explicarErro } from "@/lib/store";
 import { erro, limparItem, perfilAtual } from "@/lib/sessao";
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
   try {
     return NextResponse.json(await listarItens());
   } catch (e) {
-    return erro(`Não foi possível carregar: ${(e as Error).message}`, 500);
+    return erro(explicarErro(e), 500);
   }
 }
 
@@ -22,6 +22,6 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(await criarItem(dados, perfil), { status: 201 });
   } catch (e) {
-    return erro(`Não foi possível salvar: ${(e as Error).message}`, 500);
+    return erro(`Não foi possível salvar: ${explicarErro(e)}`, 500);
   }
 }
